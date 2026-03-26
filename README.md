@@ -1,18 +1,18 @@
 # IT Log Analyzer
 
-IT Log Analyzer is a small Python project for reading log data, summarizing common event levels, and generating a simple report.
+IT Log Analyzer on pieni Python-projekti lokidatan lukemiseen, yleisten tapahtumatasojen yhteenvedon muodostamiseen ja yksinkertaisen raportin tuottamiseen.
 
-## Current scope
+## Nykyinen laajuus
 
-The first version of the project will:
+Projektin ensimmäinen versio:
 
-- read a sample log file
-- count `ERROR`, `WARNING`, and `INFO` rows
-- print a short summary
-- write a Markdown report
-- include basic tests with `pytest`
+- lukee esimerkkilokitiedoston
+- laskee `ERROR`, `WARNING` ja `INFO` -rivien määrät
+- näyttää lyhyen yhteenvedon terminaalissa
+- kirjoittaa Markdown-raportin
+- sisältää perustestit `pytest`-kirjastolla
 
-## Project structure
+## Projektirakenne
 
 ```text
 it-log-analyzer/
@@ -32,6 +32,6 @@ it-log-analyzer/
 `-- .gitignore
 ```
 
-## Status
+## Tila
 
-The repository structure and starter files are in place. The parsing and reporting logic will be added next.
+Repositorion perusrakenne ja aloitustiedostot ovat valmiina. Seuraavaksi lisätään lokien lukeminen, analyysilogiikka ja raportin muodostus.
