@@ -113,6 +113,8 @@ def test_main_prints_summary_and_report_path(capsys: pytest.CaptureFixture[str])
 
     with patch.object(analyzer, "analyze_log_file", return_value=summary), patch.object(
         analyzer, "write_markdown_report", return_value=Path("reports/report.md")
+    ), patch.object(
+        analyzer, "write_html_report", return_value=Path("reports/report.html")
     ):
         exit_code = analyzer.main(["data/sample_logs.csv"])
 
@@ -121,3 +123,4 @@ def test_main_prints_summary_and_report_path(capsys: pytest.CaptureFixture[str])
     assert exit_code == 0
     assert "Analyysi valmis tiedostolle: data/sample_logs.csv" in captured.out
     assert "Raportti kirjoitettu tiedostoon: reports\\report.md" in captured.out
+    assert "HTML-raportti kirjoitettu tiedostoon: reports\\report.html" in captured.out
