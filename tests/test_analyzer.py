@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src import analyzer
 from src.analyzer import analyze_log_file, format_summary, read_log_rows, summarize_levels
 
 
@@ -98,3 +99,25 @@ def test_format_summary_returns_finnish_output() -> None:
     assert "Analyysi valmis tiedostolle: data/sample_logs.csv" in formatted
     assert "Riveja yhteensa: 5" in formatted
     assert "ERROR-riveja: 2" in formatted
+
+
+def test_main_prints_summary_and_report_path(capsys: pytest.CaptureFixture[str]) -> None:
+    summary = {
+        "file_path": "data/sample_logs.csv",
+        "total_rows": 5,
+        "ERROR": 2,
+        "WARNING": 1,
+        "INFO": 2,
+        "OTHER": 0,
+    }
+
+    with patch.object(analyzer, "analyze_log_file", return_value=summary), patch.object(
+        analyzer, "write_markdown_report", return_value=Path("reports/report.md")
+    ):
+        exit_code = analyzer.main(["data/sample_logs.csv"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Analyysi valmis tiedostolle: data/sample_logs.csv" in captured.out
+    assert "Raportti kirjoitettu tiedostoon: reports\\report.md" in captured.out

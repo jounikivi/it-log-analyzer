@@ -1,3 +1,11 @@
-# Report Placeholder
+# IT Log Analyzer - raportti
 
-The generated Markdown report will be written here in a later step.
+## Lahdetiedosto
+- Tiedosto: `data\sample_logs.csv`
+
+## Yhteenveto
+- Riveja yhteensa: 5
+- ERROR-riveja: 2
+- WARNING-riveja: 1
+- INFO-riveja: 2
+- Muita riveja: 0

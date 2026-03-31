@@ -8,6 +8,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Iterable
 
+from .report_generator import write_markdown_report
+
 SUPPORTED_LEVELS = ("ERROR", "WARNING", "INFO")
 
 
@@ -96,6 +98,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default="data/sample_logs.csv",
         help="Polku analysoitavaan CSV-lokitiedostoon.",
     )
+    parser.add_argument(
+        "--output",
+        default="reports/report.md",
+        help="Polku kirjoitettavaan Markdown-raporttiin.",
+    )
     return parser
 
 
@@ -105,7 +112,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_argument_parser()
     args = parser.parse_args(argv)
     summary = analyze_log_file(args.file_path)
+    report_path = write_markdown_report(summary, args.output)
     print(format_summary(summary))
+    print(f"Raportti kirjoitettu tiedostoon: {report_path}")
     return 0
 
 
