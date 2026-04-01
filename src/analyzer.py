@@ -62,30 +62,82 @@ def summarize_levels(rows: Iterable[dict[str, str]]) -> dict[str, int]:
     }
 
 
-def analyze_log_file(file_path: str | Path) -> dict[str, int | str]:
+def summarize_services(rows: Iterable[dict[str, str]]) -> dict[str, int]:
+    """Laske rivimaarat palveluittain."""
+
+    counter: Counter[str] = Counter()
+
+    for row in rows:
+        service = row.get("service", "").strip() or "UNKNOWN"
+        counter[service] += 1
+
+    return dict(sorted(counter.items(), key=lambda item: (-item[1], item[0].lower())))
+
+
+def summarize_top_error_messages(
+    rows: Iterable[dict[str, str]], limit: int = 3
+) -> list[tuple[str, int]]:
+    """Palauta yleisimmat ERROR-viestit yleisyysjarjestyksessa."""
+
+    counter: Counter[str] = Counter()
+
+    for row in rows:
+        if row.get("level", "").strip().upper() != "ERROR":
+            continue
+
+        message = row.get("message", "").strip() or "(tyhja viesti)"
+        counter[message] += 1
+
+    return sorted(counter.items(), key=lambda item: (-item[1], item[0].lower()))[:limit]
+
+
+def analyze_log_file(file_path: str | Path) -> dict[str, object]:
     """Lue tiedosto ja palauta valmis yhteenveto."""
 
     rows = read_log_rows(file_path)
     summary = summarize_levels(rows)
+    service_counts = summarize_services(rows)
+    top_error_messages = summarize_top_error_messages(rows)
+
     return {
         "file_path": str(Path(file_path)),
         **summary,
+        "service_counts": service_counts,
+        "top_error_messages": top_error_messages,
     }
 
 
-def format_summary(summary: dict[str, int | str]) -> str:
+def format_summary(summary: dict[str, object]) -> str:
     """Muodosta analyysin tuloksista suomenkielinen tekstiyhteenveto."""
 
-    return "\n".join(
-        [
-            f"Analyysi valmis tiedostolle: {summary['file_path']}",
-            f"Riveja yhteensa: {summary['total_rows']}",
-            f"ERROR-riveja: {summary['ERROR']}",
-            f"WARNING-riveja: {summary['WARNING']}",
-            f"INFO-riveja: {summary['INFO']}",
-            f"Muita riveja: {summary['OTHER']}",
-        ]
-    )
+    service_counts = summary.get("service_counts", {})
+    top_error_messages = summary.get("top_error_messages", [])
+
+    lines = [
+        f"Analyysi valmis tiedostolle: {summary['file_path']}",
+        f"Riveja yhteensa: {summary['total_rows']}",
+        f"ERROR-riveja: {summary['ERROR']}",
+        f"WARNING-riveja: {summary['WARNING']}",
+        f"INFO-riveja: {summary['INFO']}",
+        f"Muita riveja: {summary['OTHER']}",
+    ]
+
+    if isinstance(service_counts, dict) and service_counts:
+        top_service = next(iter(service_counts.items()))
+        lines.append(f"Yleisin palvelu: {top_service[0]} ({top_service[1]})")
+        lines.append("Palvelukohtainen yhteenveto:")
+        for service, count in service_counts.items():
+            lines.append(f"- {service}: {count}")
+
+    if isinstance(top_error_messages, list):
+        if top_error_messages:
+            lines.append("Yleisimmat ERROR-viestit:")
+            for message, count in top_error_messages:
+                lines.append(f"- {message} ({count})")
+        else:
+            lines.append("Yleisimmat ERROR-viestit: ei virheriveja")
+
+    return "\n".join(lines)
 
 
 def build_argument_parser() -> argparse.ArgumentParser:

@@ -17,6 +17,11 @@ def test_generate_markdown_report_contains_summary_values() -> None:
         "WARNING": 1,
         "INFO": 2,
         "OTHER": 0,
+        "service_counts": {
+            "api-gateway": 2,
+            "auth-service": 1,
+        },
+        "top_error_messages": [("Timeout", 2)],
     }
 
     report = generate_markdown_report(summary)
@@ -25,6 +30,9 @@ def test_generate_markdown_report_contains_summary_values() -> None:
     assert "- Tiedosto: `data/sample_logs.csv`" in report
     assert "- Riveja yhteensa: 5" in report
     assert "- ERROR-riveja: 2" in report
+    assert "## Palvelukohtainen yhteenveto" in report
+    assert "| api-gateway | 2 |" in report
+    assert "| Timeout | 2 |" in report
 
 
 def test_write_markdown_report_writes_content_to_target_file() -> None:
@@ -35,6 +43,11 @@ def test_write_markdown_report_writes_content_to_target_file() -> None:
         "WARNING": 1,
         "INFO": 2,
         "OTHER": 0,
+        "service_counts": {
+            "api-gateway": 2,
+            "auth-service": 1,
+        },
+        "top_error_messages": [("Timeout", 2)],
     }
     written: dict[str, str] = {}
 
@@ -59,6 +72,11 @@ def test_generate_html_report_contains_summary_values() -> None:
         "WARNING": 1,
         "INFO": 2,
         "OTHER": 0,
+        "service_counts": {
+            "api-gateway": 2,
+            "auth-service": 1,
+        },
+        "top_error_messages": [("Timeout", 2)],
     }
 
     report = generate_html_report(summary)
@@ -67,6 +85,9 @@ def test_generate_html_report_contains_summary_values() -> None:
     assert "Automaattisesti generoitu yhteenveto" in report
     assert "data/sample_logs.csv" in report
     assert ">2<" in report
+    assert "Palvelukohtainen yhteenveto" in report
+    assert "api-gateway" in report
+    assert "Timeout" in report
 
 
 def test_write_html_report_writes_content_to_target_file() -> None:
@@ -77,6 +98,11 @@ def test_write_html_report_writes_content_to_target_file() -> None:
         "WARNING": 1,
         "INFO": 2,
         "OTHER": 0,
+        "service_counts": {
+            "api-gateway": 2,
+            "auth-service": 1,
+        },
+        "top_error_messages": [("Timeout", 2)],
     }
     written: dict[str, str] = {}
 

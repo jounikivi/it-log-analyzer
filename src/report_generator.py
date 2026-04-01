@@ -7,30 +7,83 @@ from pathlib import Path
 from typing import Mapping
 
 
-def generate_markdown_report(summary: Mapping[str, int | str]) -> str:
+def get_service_counts(summary: Mapping[str, object]) -> dict[str, int]:
+    raw_value = summary.get("service_counts", {})
+    return raw_value if isinstance(raw_value, dict) else {}
+
+
+def get_top_error_messages(summary: Mapping[str, object]) -> list[tuple[str, int]]:
+    raw_value = summary.get("top_error_messages", [])
+    return raw_value if isinstance(raw_value, list) else []
+
+
+def escape_markdown_cell(value: str) -> str:
+    return value.replace("|", "\\|")
+
+
+def generate_markdown_report(summary: Mapping[str, object]) -> str:
     """Muodosta analyysin tuloksista Markdown-raportti."""
 
-    return "\n".join(
-        [
-            "# IT Log Analyzer - raportti",
-            "",
-            "## Lahdetiedosto",
-            f"- Tiedosto: `{summary['file_path']}`",
-            "",
-            "## Yhteenveto",
-            f"- Riveja yhteensa: {summary['total_rows']}",
-            f"- ERROR-riveja: {summary['ERROR']}",
-            f"- WARNING-riveja: {summary['WARNING']}",
-            f"- INFO-riveja: {summary['INFO']}",
-            f"- Muita riveja: {summary['OTHER']}",
-        ]
-    )
+    service_counts = get_service_counts(summary)
+    top_error_messages = get_top_error_messages(summary)
+
+    lines = [
+        "# IT Log Analyzer - raportti",
+        "",
+        "## Lahdetiedosto",
+        f"- Tiedosto: `{summary['file_path']}`",
+        "",
+        "## Yhteenveto",
+        f"- Riveja yhteensa: {summary['total_rows']}",
+        f"- ERROR-riveja: {summary['ERROR']}",
+        f"- WARNING-riveja: {summary['WARNING']}",
+        f"- INFO-riveja: {summary['INFO']}",
+        f"- Muita riveja: {summary['OTHER']}",
+    ]
+
+    if service_counts:
+        lines.extend(
+            [
+                "",
+                "## Palvelukohtainen yhteenveto",
+                "",
+                "| Palvelu | Rivien maara |",
+                "| --- | ---: |",
+            ]
+        )
+        for service, count in service_counts.items():
+            lines.append(f"| {escape_markdown_cell(service)} | {count} |")
+
+    lines.extend(["", "## Yleisimmat ERROR-viestit", ""])
+    if top_error_messages:
+        lines.extend(["| Viesti | Maara |", "| --- | ---: |"])
+        for message, count in top_error_messages:
+            lines.append(f"| {escape_markdown_cell(message)} | {count} |")
+    else:
+        lines.append("Ei ERROR-riveja analysoidussa tiedostossa.")
+
+    return "\n".join(lines)
 
 
-def generate_html_report(summary: Mapping[str, int | str]) -> str:
+def generate_html_report(summary: Mapping[str, object]) -> str:
     """Muodosta analyysin tuloksista HTML-raportti."""
 
     file_path = escape(str(summary["file_path"]))
+    service_counts = get_service_counts(summary)
+    top_error_messages = get_top_error_messages(summary)
+
+    service_rows = "\n".join(
+        [
+            f"              <tr><td>{escape(service)}</td><td>{count}</td></tr>"
+            for service, count in service_counts.items()
+        ]
+    )
+    error_rows = "\n".join(
+        [
+            f"              <tr><td>{escape(message)}</td><td>{count}</td></tr>"
+            for message, count in top_error_messages
+        ]
+    )
 
     return f"""<!doctype html>
 <html lang="fi">
@@ -151,6 +204,39 @@ def generate_html_report(summary: Mapping[str, int | str]) -> str:
         background: rgba(255, 255, 255, 0.78);
       }}
 
+      .details {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+        margin-top: 24px;
+      }}
+
+      .panel-title {{
+        margin: 0 0 14px;
+        font-size: 1.1rem;
+      }}
+
+      table {{
+        width: 100%;
+        border-collapse: collapse;
+      }}
+
+      th,
+      td {{
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+      }}
+
+      th:last-child,
+      td:last-child {{
+        text-align: right;
+      }}
+
+      .empty-state {{
+        color: var(--muted);
+      }}
+
       code {{
         font-family: Consolas, "Courier New", monospace;
         font-size: 0.95rem;
@@ -192,6 +278,28 @@ def generate_html_report(summary: Mapping[str, int | str]) -> str:
         <div class="label">Lahdetiedosto</div>
         <code>{file_path}</code>
       </section>
+
+      <section class="details">
+        <article class="card">
+          <h2 class="panel-title">Palvelukohtainen yhteenveto</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Palvelu</th>
+                <th>Riveja</th>
+              </tr>
+            </thead>
+            <tbody>
+{service_rows}
+            </tbody>
+          </table>
+        </article>
+
+        <article class="card">
+          <h2 class="panel-title">Yleisimmat ERROR-viestit</h2>
+{"          <table>\n            <thead>\n              <tr>\n                <th>Viesti</th>\n                <th>Maara</th>\n              </tr>\n            </thead>\n            <tbody>\n" + error_rows + "\n            </tbody>\n          </table>" if top_error_messages else '          <p class="empty-state">Ei ERROR-riveja analysoidussa tiedostossa.</p>'}
+        </article>
+      </section>
     </main>
   </body>
 </html>
@@ -199,7 +307,7 @@ def generate_html_report(summary: Mapping[str, int | str]) -> str:
 
 
 def write_markdown_report(
-    summary: Mapping[str, int | str], output_path: str | Path = "reports/report.md"
+    summary: Mapping[str, object], output_path: str | Path = "reports/report.md"
 ) -> Path:
     """Kirjoita Markdown-raportti tiedostoon ja palauta polku."""
 
@@ -210,7 +318,7 @@ def write_markdown_report(
 
 
 def write_html_report(
-    summary: Mapping[str, int | str], output_path: str | Path = "reports/report.html"
+    summary: Mapping[str, object], output_path: str | Path = "reports/report.html"
 ) -> Path:
     """Kirjoita HTML-raportti tiedostoon ja palauta polku."""
 

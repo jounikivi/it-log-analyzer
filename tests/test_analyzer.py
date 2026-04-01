@@ -5,7 +5,14 @@ from unittest.mock import patch
 import pytest
 
 from src import analyzer
-from src.analyzer import analyze_log_file, format_summary, read_log_rows, summarize_levels
+from src.analyzer import (
+    analyze_log_file,
+    format_summary,
+    read_log_rows,
+    summarize_levels,
+    summarize_services,
+    summarize_top_error_messages,
+)
 
 
 def patch_path_open(content: str):
@@ -52,6 +59,36 @@ def test_summarize_levels_counts_supported_and_other_rows() -> None:
     }
 
 
+def test_summarize_services_sorts_by_count_and_name() -> None:
+    rows = [
+        {"service": "api-gateway"},
+        {"service": "worker"},
+        {"service": "api-gateway"},
+        {"service": ""},
+    ]
+
+    summary = summarize_services(rows)
+
+    assert summary == {
+        "api-gateway": 2,
+        "UNKNOWN": 1,
+        "worker": 1,
+    }
+
+
+def test_summarize_top_error_messages_returns_most_common_items() -> None:
+    rows = [
+        {"level": "ERROR", "message": "Timeout"},
+        {"level": "ERROR", "message": "Timeout"},
+        {"level": "ERROR", "message": "Database error"},
+        {"level": "INFO", "message": "Ignored"},
+    ]
+
+    summary = summarize_top_error_messages(rows)
+
+    assert summary == [("Timeout", 2), ("Database error", 1)]
+
+
 def test_analyze_log_file_returns_complete_summary() -> None:
     content = (
         "timestamp,level,service,message\n"
@@ -70,6 +107,12 @@ def test_analyze_log_file_returns_complete_summary() -> None:
     assert summary["WARNING"] == 1
     assert summary["ERROR"] == 1
     assert summary["OTHER"] == 0
+    assert summary["service_counts"] == {
+        "api-gateway": 1,
+        "auth-service": 1,
+        "payment-service": 1,
+    }
+    assert summary["top_error_messages"] == [("Yhteysvirhe", 1)]
 
 
 def test_read_log_rows_requires_level_column() -> None:
@@ -92,6 +135,11 @@ def test_format_summary_returns_finnish_output() -> None:
         "WARNING": 1,
         "INFO": 2,
         "OTHER": 0,
+        "service_counts": {
+            "api-gateway": 2,
+            "auth-service": 1,
+        },
+        "top_error_messages": [("Timeout", 2)],
     }
 
     formatted = format_summary(summary)
@@ -99,6 +147,8 @@ def test_format_summary_returns_finnish_output() -> None:
     assert "Analyysi valmis tiedostolle: data/sample_logs.csv" in formatted
     assert "Riveja yhteensa: 5" in formatted
     assert "ERROR-riveja: 2" in formatted
+    assert "Yleisin palvelu: api-gateway (2)" in formatted
+    assert "- Timeout (2)" in formatted
 
 
 def test_main_prints_summary_and_report_path(capsys: pytest.CaptureFixture[str]) -> None:
@@ -109,6 +159,8 @@ def test_main_prints_summary_and_report_path(capsys: pytest.CaptureFixture[str])
         "WARNING": 1,
         "INFO": 2,
         "OTHER": 0,
+        "service_counts": {"api-gateway": 2},
+        "top_error_messages": [("Timeout", 2)],
     }
 
     with patch.object(analyzer, "analyze_log_file", return_value=summary), patch.object(
