@@ -79,6 +79,10 @@ Suorita testit:
 python -m pytest
 ```
 
+## Kehitysprosessi
+
+Tama projekti on toteutettu AI-avusteisesti. Tekoalya on kaytetty tukena suunnittelussa, koodin jäsentelyssä, refaktoroinnissa, testien rakentamisessa ja dokumentoinnissa. Kaikki ratkaisut on kuitenkin tarkistettu, arvioitu ja viimeistelty itse.
+
 ## Nykyinen tila
 
 Projektissa on nyt valmis ja tyylikas perusversio, joka:
