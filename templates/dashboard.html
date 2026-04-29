@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>IT Log Analyzer UI</title>
+    <link rel="stylesheet" href="/static/dashboard.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">Selainkayttoliittyma</div>
+          <h1>IT Log Analyzer</h1>
+          <p>
+            Analysoi CSV-lokeja selaimessa, hyodynna Python-moottoria taustalla ja
+            tuota raportit yhdella ajolla.
+          </p>
+        </div>
+
+        <aside class="hero-panel">
+          <div class="hero-panel-label">Valmis demottavaksi</div>
+          <ul class="hero-points">
+            <li>CLI + web-kayttoliittyma</li>
+            <li>Markdown- ja HTML-raportit</li>
+            <li>Palvelu-, virhe- ja aikaleima-analyysi</li>
+          </ul>
+        </aside>
+      </header>
+
+      <main class="layout">
+        <section class="controls card">
+          <div class="section-head">
+            <div>
+              <div class="section-kicker">Syote</div>
+              <h2>Analysoi loki</h2>
+            </div>
+            <div class="action-links">
+              <a class="ghost-link" href="{{ report_html_url }}" target="_blank" rel="noreferrer">Avaa HTML-raportti</a>
+              <a class="ghost-link" href="{{ report_markdown_url }}" target="_blank" rel="noreferrer">Avaa Markdown-raportti</a>
+            </div>
+          </div>
+
+          <form id="analysis-form" class="analysis-form" method="post" action="/analyze">
+            <input type="hidden" name="mode" id="mode-field" value="analyze">
+            <input type="hidden" name="csv_text" id="csv-text-field" value="">
+            <input type="hidden" name="source_name" id="source-name-field" value="">
+
+            <div class="field-grid">
+              <label class="field">
+                <span class="field-label">Valitse CSV koneelta</span>
+                <input id="upload-field" type="file" accept=".csv,text/csv">
+                <span class="field-help">
+                  Selain lukee tiedoston sisallon paikallisesti ja lahettaa sen analysoitavaksi.
+                </span>
+              </label>
+
+              <label class="field">
+                <span class="field-label">Tai anna tiedostopolku</span>
+                <input
+                  id="path-field"
+                  type="text"
+                  name="file_path"
+                  value="{{ form_state.file_path }}"
+                  placeholder="{{ sample_path }}"
+                >
+                <span class="field-help">
+                  Voit kayttaa suhteellista polkua projektiin tai absoluuttista polkua koneellasi.
+                </span>
+              </label>
+            </div>
+
+            <div class="field-grid compact">
+              <label class="field">
+                <span class="field-label">Naytettavat palvelut</span>
+                <input type="number" min="1" step="1" name="top_services" value="{{ form_state.top_services }}">
+              </label>
+
+              <label class="field">
+                <span class="field-label">Naytettavat ERROR-viestit</span>
+                <input type="number" min="1" step="1" name="top_errors" value="{{ form_state.top_errors }}">
+              </label>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="button secondary" id="sample-button">Kayta sample-dataa</button>
+              <button type="submit" class="button primary">Analysoi nyt</button>
+            </div>
+          </form>
+
+          {% if error_message %}
+          <div class="feedback error">{{ error_message }}</div>
+          {% endif %}
+
+          {% if success_message %}
+          <div class="feedback success">{{ success_message }}</div>
+          {% endif %}
+        </section>
+
+        {% if summary %}
+        <section class="results">
+          <section class="summary-grid">
+            <article class="metric-card">
+              <div class="metric-label">Riveja yhteensa</div>
+              <div class="metric-value">{{ summary["total_rows"] }}</div>
+            </article>
+
+            <article class="metric-card error">
+              <div class="metric-label">ERROR</div>
+              <div class="metric-value">{{ summary["ERROR"] }}</div>
+            </article>
+
+            <article class="metric-card warning">
+              <div class="metric-label">WARNING</div>
+              <div class="metric-value">{{ summary["WARNING"] }}</div>
+            </article>
+
+            <article class="metric-card info">
+              <div class="metric-label">INFO</div>
+              <div class="metric-value">{{ summary["INFO"] }}</div>
+            </article>
+
+            <article class="metric-card neutral">
+              <div class="metric-label">Muut rivit</div>
+              <div class="metric-value">{{ summary["OTHER"] }}</div>
+            </article>
+
+            {% if summary["busiest_hour"] %}
+            <article class="metric-card spotlight">
+              <div class="metric-label">Aktiivisin tunti</div>
+              <div class="metric-value small">{{ summary["busiest_hour"][0] }}</div>
+              <div class="metric-subtle">{{ summary["busiest_hour"][1] }} rivi(a)</div>
+            </article>
+            {% endif %}
+          </section>
+
+          <section class="meta-band card">
+            <div class="section-kicker">Lahde</div>
+            <div class="meta-path">{{ summary["file_path"] }}</div>
+          </section>
+
+          <section class="panel-grid">
+            <article class="card panel">
+              <div class="section-head">
+                <div>
+                  <div class="section-kicker">Palvelut</div>
+                  <h2>Palvelukohtainen yhteenveto</h2>
+                </div>
+              </div>
+
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Palvelu</th>
+                    <th>Riveja</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for service, count in summary["service_counts"].items() %}
+                  <tr>
+                    <td>{{ service }}</td>
+                    <td>{{ count }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </article>
+
+            <article class="card panel">
+              <div class="section-head">
+                <div>
+                  <div class="section-kicker">Virheet</div>
+                  <h2>Yleisimmat ERROR-viestit</h2>
+                </div>
+              </div>
+
+              {% if summary["top_error_messages"] %}
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Viesti</th>
+                    <th>Maara</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for message, count in summary["top_error_messages"] %}
+                  <tr>
+                    <td>{{ message }}</td>
+                    <td>{{ count }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              {% else %}
+              <p class="empty-note">Ei ERROR-riveja analysoidussa aineistossa.</p>
+              {% endif %}
+            </article>
+          </section>
+
+          <section class="card panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Aikaleimat</div>
+                <h2>Tuntikohtainen aktiivisuus</h2>
+              </div>
+            </div>
+
+            {% if summary["hourly_counts"] %}
+            <div class="bar-list">
+              {% for hour, count in summary["hourly_counts"].items() %}
+              <div class="bar-row">
+                <div class="bar-meta">
+                  <span>{{ hour }}</span>
+                  <strong>{{ count }}</strong>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ (count / max_hourly_count * 100)|round(1) if max_hourly_count else 0 }}%"></div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="empty-note">Aikaleimoja ei voitu tulkita tuntikohtaiseen yhteenvetoon.</p>
+            {% endif %}
+          </section>
+        </section>
+        {% endif %}
+      </main>
+    </div>
+
+    <script src="/static/dashboard.js"></script>
+  </body>
+</html>

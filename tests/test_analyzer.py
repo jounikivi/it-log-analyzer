@@ -6,11 +6,13 @@ import pytest
 
 from src import analyzer
 from src.analyzer import (
+    analyze_csv_text,
     analyze_log_file,
     format_summary,
     get_busiest_hour,
     parse_hour_bucket,
     read_log_rows,
+    read_log_rows_from_text,
     summarize_activity_by_hour,
     summarize_levels,
     summarize_services,
@@ -41,6 +43,22 @@ def test_read_log_rows_reads_csv_rows() -> None:
     assert len(rows) == 2
     assert rows[0]["level"] == "INFO"
     assert rows[1]["service"] == "api-gateway"
+
+
+def test_read_log_rows_from_text_reads_csv_rows() -> None:
+    rows = read_log_rows_from_text(
+        "timestamp,level,service,message\n"
+        "2026-03-26T08:00:00Z,INFO,auth-service,Login ok\n"
+    )
+
+    assert rows == [
+        {
+            "timestamp": "2026-03-26T08:00:00Z",
+            "level": "INFO",
+            "service": "auth-service",
+            "message": "Login ok",
+        }
+    ]
 
 
 def test_summarize_levels_counts_supported_and_other_rows() -> None:
@@ -150,6 +168,18 @@ def test_analyze_log_file_returns_complete_summary() -> None:
         "2026-03-26 09:00": 2,
     }
     assert summary["busiest_hour"] == ("2026-03-26 08:00", 2)
+
+
+def test_analyze_csv_text_returns_summary_with_custom_source_name() -> None:
+    summary = analyze_csv_text(
+        "timestamp,level,service,message\n"
+        "2026-03-26T08:00:00Z,ERROR,api-gateway,Timeout\n",
+        source_name="tuotu.csv",
+    )
+
+    assert summary["file_path"] == "tuotu.csv"
+    assert summary["ERROR"] == 1
+    assert summary["top_error_messages"] == [("Timeout", 1)]
 
 
 def test_read_log_rows_requires_level_column() -> None:

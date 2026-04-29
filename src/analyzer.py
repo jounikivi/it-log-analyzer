@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, TypedDict
+from typing import Iterable, TextIO, TypedDict
 
 from .report_generator import write_html_report, write_markdown_report
 
@@ -28,29 +29,40 @@ class LogSummary(TypedDict):
     busiest_hour: tuple[str, int] | None
 
 
+def read_log_rows_from_stream(stream: TextIO) -> list[dict[str, str]]:
+    """Lue CSV-muotoinen lokidata tiedostovirrasta listaksi riveja."""
+
+    reader = csv.DictReader(stream)
+    if reader.fieldnames is None:
+        raise ValueError("Lokitiedosto on tyhja.")
+
+    normalized_fieldnames = [(field or "").strip().lower() for field in reader.fieldnames]
+    if "level" not in normalized_fieldnames:
+        raise ValueError("Lokitiedostosta puuttuu 'level'-sarake.")
+
+    rows: list[dict[str, str]] = []
+    for row in reader:
+        normalized_row = {
+            (key or "").strip().lower(): (value or "").strip() for key, value in row.items()
+        }
+        rows.append(normalized_row)
+
+    return rows
+
+
+def read_log_rows_from_text(csv_text: str) -> list[dict[str, str]]:
+    """Lue CSV-muotoinen lokidata tekstista."""
+
+    return read_log_rows_from_stream(io.StringIO(csv_text))
+
+
 def read_log_rows(file_path: str | Path) -> list[dict[str, str]]:
     """Lue CSV-muotoinen lokitiedosto listaksi riveja."""
 
     path = Path(file_path)
 
     with path.open("r", encoding="utf-8", newline="") as file:
-        reader = csv.DictReader(file)
-        if reader.fieldnames is None:
-            raise ValueError("Lokitiedosto on tyhja.")
-
-        normalized_fieldnames = [(field or "").strip().lower() for field in reader.fieldnames]
-        if "level" not in normalized_fieldnames:
-            raise ValueError("Lokitiedostosta puuttuu 'level'-sarake.")
-
-        rows: list[dict[str, str]] = []
-        for row in reader:
-            normalized_row = {
-                (key or "").strip().lower(): (value or "").strip()
-                for key, value in row.items()
-            }
-            rows.append(normalized_row)
-
-    return rows
+        return read_log_rows_from_stream(file)
 
 
 def summarize_levels(rows: Iterable[dict[str, str]]) -> dict[str, int]:
@@ -155,12 +167,14 @@ def positive_int(value: str) -> int:
     return integer
 
 
-def analyze_log_file(
-    file_path: str | Path, top_services: int = 5, top_errors: int = 5
+def analyze_log_rows(
+    rows: list[dict[str, str]],
+    source_name: str,
+    top_services: int = 5,
+    top_errors: int = 5,
 ) -> LogSummary:
-    """Lue tiedosto ja palauta valmis yhteenveto."""
+    """Luo valmis yhteenveto jo luetuista lokiriveista."""
 
-    rows = read_log_rows(file_path)
     summary = summarize_levels(rows)
     service_counts = dict(list(summarize_services(rows).items())[:top_services])
     top_error_messages = summarize_top_error_messages(rows, limit=top_errors)
@@ -168,13 +182,44 @@ def analyze_log_file(
     busiest_hour = get_busiest_hour(hourly_counts)
 
     return {
-        "file_path": str(Path(file_path)),
+        "file_path": source_name,
         **summary,
         "service_counts": service_counts,
         "top_error_messages": top_error_messages,
         "hourly_counts": hourly_counts,
         "busiest_hour": busiest_hour,
     }
+
+
+def analyze_csv_text(
+    csv_text: str,
+    source_name: str = "syotetty_lokidata.csv",
+    top_services: int = 5,
+    top_errors: int = 5,
+) -> LogSummary:
+    """Analysoi selaimesta tai muualta saatua CSV-tekstia."""
+
+    rows = read_log_rows_from_text(csv_text)
+    return analyze_log_rows(
+        rows,
+        source_name=source_name,
+        top_services=top_services,
+        top_errors=top_errors,
+    )
+
+
+def analyze_log_file(
+    file_path: str | Path, top_services: int = 5, top_errors: int = 5
+) -> LogSummary:
+    """Lue tiedosto ja palauta valmis yhteenveto."""
+
+    rows = read_log_rows(file_path)
+    return analyze_log_rows(
+        rows,
+        source_name=str(Path(file_path)),
+        top_services=top_services,
+        top_errors=top_errors,
+    )
 
 
 def format_summary(summary: LogSummary) -> str:

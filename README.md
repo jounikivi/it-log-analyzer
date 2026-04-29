@@ -15,6 +15,7 @@ Nykyinen versio:
 - näyttää lyhyen yhteenvedon terminaalissa
 - kirjoittaa Markdown-raportin tiedostoon `reports/report.md`
 - kirjoittaa HTML-raportin tiedostoon `reports/report.html`
+- tarjoaa selainkayttoliittyman tiedoston valintaan ja tulosten tarkasteluun
 - sisältää perustestit `pytest`-kirjastolla
 
 ## Projektirakenne
@@ -26,16 +27,23 @@ it-log-analyzer/
 |-- pytest.ini
 |-- data/
 |   `-- sample_logs.csv
+|-- static/
+|   |-- dashboard.css
+|   `-- dashboard.js
 |-- src/
 |   |-- __init__.py
 |   |-- analyzer.py
-|   `-- report_generator.py
+|   |-- report_generator.py
+|   `-- web_app.py
+|-- templates/
+|   `-- dashboard.html
 |-- reports/
 |   |-- report.md
 |   `-- report.html
 |-- tests/
 |   |-- test_analyzer.py
-|   `-- test_report_generator.py
+|   |-- test_report_generator.py
+|   `-- test_web_app.py
 `-- .gitignore
 ```
 
@@ -71,6 +79,28 @@ Voit myos rajata kuinka monta palvelua ja virheviestia raporteissa naytetaan:
 python -m src.analyzer data/sample_logs.csv --top-services 3 --top-errors 3
 ```
 
+## Selainkayttoliittyma
+
+Kaynnista paikallinen selainkayttoliittyma:
+
+```powershell
+python -m src.web_app
+```
+
+Taman jalkeen avaa selaimessa osoite:
+
+```text
+http://127.0.0.1:8000
+```
+
+Kayttoliittymassa voit:
+
+- kayttaa valmista sample-dataa yhdella painikkeella
+- valita CSV-tiedoston suoraan koneelta selaimen kautta
+- syottaa tiedostopolun kasin
+- rajata naytettavien palveluiden ja ERROR-viestien maaraa
+- avata generoituja Markdown- ja HTML-raportteja suoraan linkeista
+
 ## Testit
 
 Suorita testit:
@@ -88,12 +118,13 @@ Tama projekti on toteutettu AI-avusteisesti. Tekoalya on kaytetty tukena suunnit
 Projektissa on nyt valmis ja tyylikas perusversio, joka:
 
 - analysoi sample-lokin suoraan komentorivilta
+- tarjoaa selainkayttoliittyman analyysin ajamiseen ja tulosten tarkasteluun
 - generoi valmiit raportit tiedostoihin `reports/report.md` ja `reports/report.html`
-- sisaltaa testit analyysille, raporttigeneroinnille ja komentorivivirheiden kasittelylle
+- sisaltaa testit analyysille, raporttigeneroinnille, web-kayttoliittyman apulogiikalle ja komentorivivirheiden kasittelylle
 - tuottaa portfoliokelpoisen lopputuloksen, joka on helppo nayttaa GitHubissa
 
 Seuraavat mahdolliset jatkokehitykset voivat olla esimerkiksi:
 
-- palvelukohtainen suodatus komentorivilta
+- palvelukohtainen suodatus komentorivilta ja UI:sta
 - virhetrendien analysointi pidemmalta aikavalilta
 - JSON- tai Excel-vienti

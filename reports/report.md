@@ -1,7 +1,7 @@
 # IT Log Analyzer - raportti
 
 ## Lahdetiedosto
-- Tiedosto: `data\sample_logs.csv`
+- Tiedosto: `data/sample_logs.csv`
 
 ## Yhteenveto
 - Riveja yhteensa: 10
