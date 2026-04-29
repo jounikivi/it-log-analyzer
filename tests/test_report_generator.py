@@ -22,6 +22,11 @@ def test_generate_markdown_report_contains_summary_values() -> None:
             "auth-service": 1,
         },
         "top_error_messages": [("Timeout", 2)],
+        "hourly_counts": {
+            "2026-03-26 08:00": 3,
+            "2026-03-26 09:00": 2,
+        },
+        "busiest_hour": ("2026-03-26 08:00", 3),
     }
 
     report = generate_markdown_report(summary)
@@ -30,8 +35,11 @@ def test_generate_markdown_report_contains_summary_values() -> None:
     assert "- Tiedosto: `data/sample_logs.csv`" in report
     assert "- Riveja yhteensa: 5" in report
     assert "- ERROR-riveja: 2" in report
+    assert "- Aktiivisin tunti: 2026-03-26 08:00 (3 rivi(a))" in report
     assert "## Palvelukohtainen yhteenveto" in report
+    assert "## Tuntikohtainen aktiivisuus" in report
     assert "| api-gateway | 2 |" in report
+    assert "| 2026-03-26 09:00 | 2 |" in report
     assert "| Timeout | 2 |" in report
 
 
@@ -48,6 +56,11 @@ def test_write_markdown_report_writes_content_to_target_file() -> None:
             "auth-service": 1,
         },
         "top_error_messages": [("Timeout", 2)],
+        "hourly_counts": {
+            "2026-03-26 08:00": 3,
+            "2026-03-26 09:00": 2,
+        },
+        "busiest_hour": ("2026-03-26 08:00", 3),
     }
     written: dict[str, str] = {}
 
@@ -77,6 +90,11 @@ def test_generate_html_report_contains_summary_values() -> None:
             "auth-service": 1,
         },
         "top_error_messages": [("Timeout", 2)],
+        "hourly_counts": {
+            "2026-03-26 08:00": 3,
+            "2026-03-26 09:00": 2,
+        },
+        "busiest_hour": ("2026-03-26 08:00", 3),
     }
 
     report = generate_html_report(summary)
@@ -85,7 +103,10 @@ def test_generate_html_report_contains_summary_values() -> None:
     assert "Automaattisesti generoitu yhteenveto" in report
     assert "data/sample_logs.csv" in report
     assert ">2<" in report
+    assert "Aktiivisin tunti" in report
+    assert "2026-03-26 08:00" in report
     assert "Palvelukohtainen yhteenveto" in report
+    assert "Tuntikohtainen aktiivisuus" in report
     assert "api-gateway" in report
     assert "Timeout" in report
 
@@ -103,6 +124,11 @@ def test_write_html_report_writes_content_to_target_file() -> None:
             "auth-service": 1,
         },
         "top_error_messages": [("Timeout", 2)],
+        "hourly_counts": {
+            "2026-03-26 08:00": 3,
+            "2026-03-26 09:00": 2,
+        },
+        "busiest_hour": ("2026-03-26 08:00", 3),
     }
     written: dict[str, str] = {}
 

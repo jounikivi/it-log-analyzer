@@ -17,6 +17,18 @@ def get_top_error_messages(summary: Mapping[str, object]) -> list[tuple[str, int
     return raw_value if isinstance(raw_value, list) else []
 
 
+def get_hourly_counts(summary: Mapping[str, object]) -> dict[str, int]:
+    raw_value = summary.get("hourly_counts", {})
+    return raw_value if isinstance(raw_value, dict) else {}
+
+
+def get_busiest_hour(summary: Mapping[str, object]) -> tuple[str, int] | None:
+    raw_value = summary.get("busiest_hour")
+    if isinstance(raw_value, tuple) and len(raw_value) == 2:
+        return raw_value
+    return None
+
+
 def escape_markdown_cell(value: str) -> str:
     return value.replace("|", "\\|")
 
@@ -26,6 +38,8 @@ def generate_markdown_report(summary: Mapping[str, object]) -> str:
 
     service_counts = get_service_counts(summary)
     top_error_messages = get_top_error_messages(summary)
+    hourly_counts = get_hourly_counts(summary)
+    busiest_hour = get_busiest_hour(summary)
 
     lines = [
         "# IT Log Analyzer - raportti",
@@ -41,6 +55,9 @@ def generate_markdown_report(summary: Mapping[str, object]) -> str:
         f"- Muita riveja: {summary['OTHER']}",
     ]
 
+    if busiest_hour is not None:
+        lines.append(f"- Aktiivisin tunti: {busiest_hour[0]} ({busiest_hour[1]} rivi(a))")
+
     if service_counts:
         lines.extend(
             [
@@ -53,6 +70,19 @@ def generate_markdown_report(summary: Mapping[str, object]) -> str:
         )
         for service, count in service_counts.items():
             lines.append(f"| {escape_markdown_cell(service)} | {count} |")
+
+    if hourly_counts:
+        lines.extend(
+            [
+                "",
+                "## Tuntikohtainen aktiivisuus",
+                "",
+                "| Tunti | Rivien maara |",
+                "| --- | ---: |",
+            ]
+        )
+        for hour, count in hourly_counts.items():
+            lines.append(f"| {hour} | {count} |")
 
     lines.extend(["", "## Yleisimmat ERROR-viestit", ""])
     if top_error_messages:
@@ -71,6 +101,8 @@ def generate_html_report(summary: Mapping[str, object]) -> str:
     file_path = escape(str(summary["file_path"]))
     service_counts = get_service_counts(summary)
     top_error_messages = get_top_error_messages(summary)
+    hourly_counts = get_hourly_counts(summary)
+    busiest_hour = get_busiest_hour(summary)
 
     service_rows = "\n".join(
         [
@@ -83,6 +115,54 @@ def generate_html_report(summary: Mapping[str, object]) -> str:
             f"              <tr><td>{escape(message)}</td><td>{count}</td></tr>"
             for message, count in top_error_messages
         ]
+    )
+    hourly_rows = "\n".join(
+        [f"              <tr><td>{hour}</td><td>{count}</td></tr>" for hour, count in hourly_counts.items()]
+    )
+    busiest_hour_markup = (
+        f"""
+        <article class="card accent">
+          <div class="label">Aktiivisin tunti</div>
+          <div class="value small">{busiest_hour[0]}</div>
+          <p>{busiest_hour[1]} rivi(a)</p>
+        </article>
+"""
+        if busiest_hour is not None
+        else ""
+    )
+    error_panel_markup = (
+        """          <table>
+            <thead>
+              <tr>
+                <th>Viesti</th>
+                <th>Maara</th>
+              </tr>
+            </thead>
+            <tbody>
+"""
+        + error_rows
+        + """
+            </tbody>
+          </table>"""
+        if top_error_messages
+        else '          <p class="empty-state">Ei ERROR-riveja analysoidussa tiedostossa.</p>'
+    )
+    hourly_panel_markup = (
+        """          <table>
+            <thead>
+              <tr>
+                <th>Tunti</th>
+                <th>Riveja</th>
+              </tr>
+            </thead>
+            <tbody>
+"""
+        + hourly_rows
+        + """
+            </tbody>
+          </table>"""
+        if hourly_counts
+        else '          <p class="empty-state">Aikaleimoja ei voitu tulkita tuntikohtaiseen yhteenvetoon.</p>'
     )
 
     return f"""<!doctype html>
@@ -196,6 +276,11 @@ def generate_html_report(summary: Mapping[str, object]) -> str:
         color: var(--other);
       }}
 
+      .accent {{
+        background: linear-gradient(135deg, #eef6ff 0%, #ffffff 100%);
+        border-color: #bfdbfe;
+      }}
+
       .source {{
         margin-top: 24px;
         padding: 20px;
@@ -214,6 +299,11 @@ def generate_html_report(summary: Mapping[str, object]) -> str:
       .panel-title {{
         margin: 0 0 14px;
         font-size: 1.1rem;
+      }}
+
+      .small {{
+        font-size: 1.35rem;
+        line-height: 1.3;
       }}
 
       table {{
@@ -272,6 +362,7 @@ def generate_html_report(summary: Mapping[str, object]) -> str:
           <div class="label">Muita riveja</div>
           <div class="value">{summary["OTHER"]}</div>
         </article>
+{busiest_hour_markup}
       </section>
 
       <section class="source">
@@ -297,7 +388,12 @@ def generate_html_report(summary: Mapping[str, object]) -> str:
 
         <article class="card">
           <h2 class="panel-title">Yleisimmat ERROR-viestit</h2>
-{"          <table>\n            <thead>\n              <tr>\n                <th>Viesti</th>\n                <th>Maara</th>\n              </tr>\n            </thead>\n            <tbody>\n" + error_rows + "\n            </tbody>\n          </table>" if top_error_messages else '          <p class="empty-state">Ei ERROR-riveja analysoidussa tiedostossa.</p>'}
+{error_panel_markup}
+        </article>
+
+        <article class="card">
+          <h2 class="panel-title">Tuntikohtainen aktiivisuus</h2>
+{hourly_panel_markup}
         </article>
       </section>
     </main>

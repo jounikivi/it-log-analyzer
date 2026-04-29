@@ -1,6 +1,6 @@
 # IT Log Analyzer
 
-IT Log Analyzer on pieni Python-projekti CSV-muotoisen lokidatan lukemiseen, tapahtumatasojen yhteenvedon muodostamiseen ja raporttien tuottamiseen.
+IT Log Analyzer on pieni mutta portfolioon sopiva Python-projekti CSV-muotoisen lokidatan lukemiseen, analysointiin ja raporttien tuottamiseen. Projekti keskittyy siistiin komentorivikäyttöön, testattuun analyysilogiikkaan ja kahteen raporttimuotoon: Markdowniin ja HTML:ään.
 
 ## Mitä projekti tekee
 
@@ -9,6 +9,9 @@ Nykyinen versio:
 - lukee CSV-muotoisen lokitiedoston
 - laskee `ERROR`, `WARNING` ja `INFO` -rivien määrät
 - niputtaa muut tasot `OTHER`-luokkaan
+- nostaa esiin palvelukohtaiset rivimäärät
+- tunnistaa yleisimmät `ERROR`-viestit
+- analysoi tuntikohtaisen aktiivisuuden aikaleimojen perusteella
 - näyttää lyhyen yhteenvedon terminaalissa
 - kirjoittaa Markdown-raportin tiedostoon `reports/report.md`
 - kirjoittaa HTML-raportin tiedostoon `reports/report.html`
@@ -62,6 +65,12 @@ Voit antaa raporttien tulostepolut myös itse:
 python -m src.analyzer data/sample_logs.csv --output reports/report.md --html-output reports/report.html
 ```
 
+Voit myos rajata kuinka monta palvelua ja virheviestia raporteissa naytetaan:
+
+```powershell
+python -m src.analyzer data/sample_logs.csv --top-services 3 --top-errors 3
+```
+
 ## Testit
 
 Suorita testit:
@@ -72,4 +81,15 @@ python -m pytest
 
 ## Nykyinen tila
 
-Projektissa on nyt toimiva ensimmäinen versio, joka analysoi sample-lokin, tulostaa yhteenvedon terminaaliin ja generoi sekä Markdown- että HTML-raportin. Seuraavat luontevat laajennukset ovat esimerkiksi virheviestien tarkempi analyysi, palvelukohtaiset yhteenvedot tai komentoriviparametrien laajentaminen.
+Projektissa on nyt valmis ja tyylikas perusversio, joka:
+
+- analysoi sample-lokin suoraan komentorivilta
+- generoi valmiit raportit tiedostoihin `reports/report.md` ja `reports/report.html`
+- sisaltaa testit analyysille, raporttigeneroinnille ja komentorivivirheiden kasittelylle
+- tuottaa portfoliokelpoisen lopputuloksen, joka on helppo nayttaa GitHubissa
+
+Seuraavat mahdolliset jatkokehitykset voivat olla esimerkiksi:
+
+- palvelukohtainen suodatus komentorivilta
+- virhetrendien analysointi pidemmalta aikavalilta
+- JSON- tai Excel-vienti

@@ -8,7 +8,10 @@ from src import analyzer
 from src.analyzer import (
     analyze_log_file,
     format_summary,
+    get_busiest_hour,
+    parse_hour_bucket,
     read_log_rows,
+    summarize_activity_by_hour,
     summarize_levels,
     summarize_services,
     summarize_top_error_messages,
@@ -89,30 +92,64 @@ def test_summarize_top_error_messages_returns_most_common_items() -> None:
     assert summary == [("Timeout", 2), ("Database error", 1)]
 
 
+def test_parse_hour_bucket_parses_iso_timestamp() -> None:
+    assert parse_hour_bucket("2026-03-26T08:07:33Z") == "2026-03-26 08:00"
+
+
+def test_summarize_activity_by_hour_returns_sorted_counts() -> None:
+    rows = [
+        {"timestamp": "2026-03-26T09:10:00Z"},
+        {"timestamp": "2026-03-26T08:05:00Z"},
+        {"timestamp": "2026-03-26T09:20:00Z"},
+        {"timestamp": "not-a-timestamp"},
+    ]
+
+    summary = summarize_activity_by_hour(rows)
+
+    assert summary == {
+        "2026-03-26 08:00": 1,
+        "2026-03-26 09:00": 2,
+    }
+
+
+def test_get_busiest_hour_returns_most_active_slot() -> None:
+    hourly_counts = {
+        "2026-03-26 08:00": 1,
+        "2026-03-26 09:00": 2,
+    }
+
+    assert get_busiest_hour(hourly_counts) == ("2026-03-26 09:00", 2)
+
+
 def test_analyze_log_file_returns_complete_summary() -> None:
     content = (
         "timestamp,level,service,message\n"
         "2026-03-26T08:00:00Z,INFO,auth-service,Login ok\n"
         "2026-03-26T08:01:12Z,WARNING,api-gateway,Hidas vasteaika\n"
-        "2026-03-26T08:03:45Z,ERROR,payment-service,Yhteysvirhe\n"
+        "2026-03-26T09:03:45Z,ERROR,payment-service,Yhteysvirhe\n"
+        "2026-03-26T09:08:45Z,ERROR,payment-service,Yhteysvirhe\n"
     )
     file_path = Path("sample_logs.csv")
 
     with patch_path_open(content):
-        summary = analyze_log_file(file_path)
+        summary = analyze_log_file(file_path, top_services=2, top_errors=1)
 
     assert summary["file_path"] == str(file_path)
-    assert summary["total_rows"] == 3
+    assert summary["total_rows"] == 4
     assert summary["INFO"] == 1
     assert summary["WARNING"] == 1
-    assert summary["ERROR"] == 1
+    assert summary["ERROR"] == 2
     assert summary["OTHER"] == 0
     assert summary["service_counts"] == {
+        "payment-service": 2,
         "api-gateway": 1,
-        "auth-service": 1,
-        "payment-service": 1,
     }
-    assert summary["top_error_messages"] == [("Yhteysvirhe", 1)]
+    assert summary["top_error_messages"] == [("Yhteysvirhe", 2)]
+    assert summary["hourly_counts"] == {
+        "2026-03-26 08:00": 2,
+        "2026-03-26 09:00": 2,
+    }
+    assert summary["busiest_hour"] == ("2026-03-26 08:00", 2)
 
 
 def test_read_log_rows_requires_level_column() -> None:
@@ -140,6 +177,11 @@ def test_format_summary_returns_finnish_output() -> None:
             "auth-service": 1,
         },
         "top_error_messages": [("Timeout", 2)],
+        "hourly_counts": {
+            "2026-03-26 08:00": 3,
+            "2026-03-26 09:00": 2,
+        },
+        "busiest_hour": ("2026-03-26 08:00", 3),
     }
 
     formatted = format_summary(summary)
@@ -148,6 +190,8 @@ def test_format_summary_returns_finnish_output() -> None:
     assert "Riveja yhteensa: 5" in formatted
     assert "ERROR-riveja: 2" in formatted
     assert "Yleisin palvelu: api-gateway (2)" in formatted
+    assert "Aktiivisin tunti: 2026-03-26 08:00 (3 rivi(a))" in formatted
+    assert "- 2026-03-26 09:00: 2" in formatted
     assert "- Timeout (2)" in formatted
 
 
@@ -161,6 +205,8 @@ def test_main_prints_summary_and_report_path(capsys: pytest.CaptureFixture[str])
         "OTHER": 0,
         "service_counts": {"api-gateway": 2},
         "top_error_messages": [("Timeout", 2)],
+        "hourly_counts": {"2026-03-26 08:00": 3},
+        "busiest_hour": ("2026-03-26 08:00", 3),
     }
 
     with patch.object(analyzer, "analyze_log_file", return_value=summary), patch.object(
@@ -176,3 +222,15 @@ def test_main_prints_summary_and_report_path(capsys: pytest.CaptureFixture[str])
     assert "Analyysi valmis tiedostolle: data/sample_logs.csv" in captured.out
     assert "Raportti kirjoitettu tiedostoon: reports\\report.md" in captured.out
     assert "HTML-raportti kirjoitettu tiedostoon: reports\\report.html" in captured.out
+
+
+def test_main_returns_error_code_and_message_for_missing_file(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with patch.object(analyzer, "analyze_log_file", side_effect=FileNotFoundError):
+        exit_code = analyzer.main(["missing.csv"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "Virhe: tiedostoa ei loytynyt: missing.csv" in captured.err

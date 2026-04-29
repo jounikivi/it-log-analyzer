@@ -4,3 +4,8 @@ timestamp,level,service,message
 2026-03-26T08:03:45Z,ERROR,payment-service,Database connection failed
 2026-03-26T08:05:10Z,INFO,worker,Retry job scheduled
 2026-03-26T08:07:33Z,ERROR,api-gateway,Upstream service timeout
+2026-03-26T09:10:05Z,INFO,api-gateway,Health check passed
+2026-03-26T09:12:44Z,ERROR,api-gateway,Upstream service timeout
+2026-03-26T09:15:18Z,WARNING,payment-service,Slow payment confirmation
+2026-03-26T10:02:01Z,ERROR,auth-service,Invalid session token
+2026-03-26T10:18:27Z,INFO,worker,Background cleanup completed
