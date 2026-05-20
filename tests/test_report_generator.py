@@ -100,7 +100,7 @@ def test_generate_html_report_contains_summary_values() -> None:
     report = generate_html_report(summary)
 
     assert "<title>IT Log Analyzer - raportti</title>" in report
-    assert "Automaattisesti generoitu yhteenveto" in report
+    assert "Paikallisesti generoitu raportti" in report
     assert "data/sample_logs.csv" in report
     assert ">2<" in report
     assert "Aktiivisin tunti" in report
@@ -109,6 +109,8 @@ def test_generate_html_report_contains_summary_values() -> None:
     assert "Tuntikohtainen aktiivisuus" in report
     assert "api-gateway" in report
     assert "Timeout" in report
+    assert "<style>" in report
+    assert ".report-shell" in report
 
 
 def test_write_html_report_writes_content_to_target_file() -> None:

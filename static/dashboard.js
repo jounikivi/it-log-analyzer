@@ -1,51 +1,21 @@
 (function () {
-  const form = document.getElementById("analysis-form");
-  const sampleButton = document.getElementById("sample-button");
   const uploadField = document.getElementById("upload-field");
-  const pathField = document.getElementById("path-field");
-  const csvTextField = document.getElementById("csv-text-field");
-  const sourceNameField = document.getElementById("source-name-field");
-  const modeField = document.getElementById("mode-field");
+  const uploadHelp = document.getElementById("upload-help");
 
-  if (!form) {
+  if (!uploadField || !uploadHelp) {
     return;
   }
 
-  sampleButton?.addEventListener("click", function () {
-    modeField.value = "sample";
-    csvTextField.value = "";
-    sourceNameField.value = "";
-    if (uploadField) {
-      uploadField.value = "";
-    }
-    if (pathField) {
-      pathField.value = "";
-    }
-    form.submit();
-  });
+  const defaultHelpText = uploadHelp.dataset.defaultText || uploadHelp.textContent || "";
 
-  form.addEventListener("submit", async function (event) {
-    modeField.value = "analyze";
-
-    const selectedFile = uploadField?.files?.[0];
+  uploadField.addEventListener("change", function () {
+    const selectedFile = uploadField.files?.[0];
     if (!selectedFile) {
-      csvTextField.value = "";
-      sourceNameField.value = "";
+      uploadHelp.textContent = defaultHelpText;
       return;
     }
 
-    event.preventDefault();
-
-    try {
-      const csvText = await selectedFile.text();
-      csvTextField.value = csvText;
-      sourceNameField.value = selectedFile.name;
-      if (pathField) {
-        pathField.value = "";
-      }
-      form.submit();
-    } catch (error) {
-      window.alert("Tiedoston lukeminen selaimessa ei onnistunut.");
-    }
+    const sizeInKb = (selectedFile.size / 1024).toFixed(1);
+    uploadHelp.textContent = "Valittu tiedosto: " + selectedFile.name + " (" + sizeInKb + " KB)";
   });
 })();

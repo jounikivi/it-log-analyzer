@@ -35,37 +35,36 @@
               <div class="section-kicker">Syote</div>
               <h2>Analysoi loki</h2>
             </div>
+            {% if summary %}
             <div class="action-links">
               <a class="ghost-link" href="{{ report_html_url }}" target="_blank" rel="noreferrer">Avaa HTML-raportti</a>
               <a class="ghost-link" href="{{ report_markdown_url }}" target="_blank" rel="noreferrer">Avaa Markdown-raportti</a>
             </div>
+            {% else %}
+            <div class="section-kicker muted-kicker">Raporttilinkit tulevat nakyviin analyysin jalkeen.</div>
+            {% endif %}
           </div>
 
-          <form id="analysis-form" class="analysis-form" method="post" action="/analyze">
-            <input type="hidden" name="mode" id="mode-field" value="analyze">
-            <input type="hidden" name="csv_text" id="csv-text-field" value="">
-            <input type="hidden" name="source_name" id="source-name-field" value="">
+          <form id="analysis-form" class="analysis-form" method="post" action="/analyze" enctype="multipart/form-data">
+            <input type="hidden" name="mode" value="analyze">
 
             <div class="field-grid">
               <label class="field">
                 <span class="field-label">Valitse CSV koneelta</span>
-                <input id="upload-field" type="file" accept=".csv,text/csv">
-                <span class="field-help">
-                  Selain lukee tiedoston sisallon paikallisesti ja lahettaa sen analysoitavaksi.
+                <input id="upload-field" type="file" name="upload_file" accept=".csv,text/csv">
+                <span class="field-help" id="upload-help" data-default-text="Valitse UTF-8-koodattu CSV-tiedosto, enintaan {{ max_upload_size_mb }} MB.">
+                  Valitse UTF-8-koodattu CSV-tiedosto, enintaan {{ max_upload_size_mb }} MB.
                 </span>
               </label>
 
               <label class="field">
-                <span class="field-label">Tai anna tiedostopolku</span>
-                <input
-                  id="path-field"
-                  type="text"
-                  name="file_path"
-                  value="{{ form_state.file_path }}"
-                  placeholder="{{ sample_path }}"
-                >
+                <span class="field-label">Komentorivi vaihtoehtona</span>
+                <div class="field-inline-note">
+                  Web-kayttoliittymassa tiedosto valitaan selaimesta. Jos haluat ajaa analyysin suoralla tiedostopolulla,
+                  kayta komentoriviversiota.
+                </div>
                 <span class="field-help">
-                  Voit kayttaa suhteellista polkua projektiin tai absoluuttista polkua koneellasi.
+                  Esimerkki: <code>python -m src.analyzer data/sample_logs.csv</code>
                 </span>
               </label>
             </div>
@@ -82,9 +81,53 @@
               </label>
             </div>
 
+            <div class="filters-card">
+              <div class="filters-head">
+                <div class="section-kicker">Suodattimet</div>
+                <p class="filters-copy">Rajaa analyysia palvelun, lokitason tai viestisisallon perusteella.</p>
+              </div>
+
+              <div class="field-grid filters-grid">
+                <label class="field">
+                  <span class="field-label">Lokitaso</span>
+                  <select name="level_filter">
+                    {% for option in level_filter_options %}
+                    <option value="{{ option }}" {% if form_state.level_filter == option %}selected{% endif %}>
+                      {% if option %}
+                      {{ option }}
+                      {% else %}
+                      Kaikki tasot
+                      {% endif %}
+                    </option>
+                    {% endfor %}
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span class="field-label">Palveluhaku</span>
+                  <input
+                    type="text"
+                    name="service_query"
+                    value="{{ form_state.service_query }}"
+                    placeholder="esim. api-gateway"
+                  >
+                </label>
+
+                <label class="field">
+                  <span class="field-label">Viestihaku</span>
+                  <input
+                    type="text"
+                    name="message_query"
+                    value="{{ form_state.message_query }}"
+                    placeholder="esim. timeout"
+                  >
+                </label>
+              </div>
+            </div>
+
             <div class="form-actions">
-              <button type="button" class="button secondary" id="sample-button">Kayta sample-dataa</button>
               <button type="submit" class="button primary">Analysoi nyt</button>
+              <button type="submit" class="button secondary" id="sample-button" name="mode" value="sample">Kayta sample-dataa</button>
             </div>
           </form>
 
@@ -99,6 +142,17 @@
 
         {% if summary %}
         <section class="results">
+          {% if active_filters %}
+          <section class="card active-filters-panel">
+            <div class="section-kicker">Aktiiviset suodattimet</div>
+            <div class="filter-chip-list">
+              {% for active_filter in active_filters %}
+              <span class="filter-chip">{{ active_filter }}</span>
+              {% endfor %}
+            </div>
+          </section>
+          {% endif %}
+
           <section class="summary-grid">
             <article class="metric-card">
               <div class="metric-label">Riveja yhteensa</div>
@@ -148,6 +202,7 @@
                 </div>
               </div>
 
+              {% if summary["service_counts"] %}
               <table class="data-table">
                 <thead>
                   <tr>
@@ -164,6 +219,9 @@
                   {% endfor %}
                 </tbody>
               </table>
+              {% else %}
+              <p class="empty-note">Palvelukohtaista dataa ei loytynyt nykyisilla suodattimilla.</p>
+              {% endif %}
             </article>
 
             <article class="card panel">
@@ -223,6 +281,14 @@
             <p class="empty-note">Aikaleimoja ei voitu tulkita tuntikohtaiseen yhteenvetoon.</p>
             {% endif %}
           </section>
+        </section>
+        {% else %}
+        <section class="card empty-state-panel">
+          <div class="section-kicker">Valmis aloitukseen</div>
+          <h2>Ei analyysiä vielä</h2>
+          <p class="empty-note">
+            Valitse CSV-tiedosto koneeltasi tai kokeile sample-dataa, niin yhteenveto ja raporttilinkit tulevat näkyviin tähän.
+          </p>
         </section>
         {% endif %}
       </main>

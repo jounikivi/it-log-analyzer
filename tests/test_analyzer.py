@@ -8,8 +8,10 @@ from src import analyzer
 from src.analyzer import (
     analyze_csv_text,
     analyze_log_file,
+    filter_rows,
     format_summary,
     get_busiest_hour,
+    normalize_level_filter,
     parse_hour_bucket,
     read_log_rows,
     read_log_rows_from_text,
@@ -110,6 +112,34 @@ def test_summarize_top_error_messages_returns_most_common_items() -> None:
     assert summary == [("Timeout", 2), ("Database error", 1)]
 
 
+def test_normalize_level_filter_accepts_supported_values() -> None:
+    assert normalize_level_filter(" warning ") == "WARNING"
+    assert normalize_level_filter("") == ""
+
+
+def test_filter_rows_applies_level_service_and_message_queries() -> None:
+    rows = [
+        {"level": "INFO", "service": "auth-service", "message": "Login ok"},
+        {"level": "ERROR", "service": "api-gateway", "message": "Timeout while calling upstream"},
+        {"level": "ERROR", "service": "worker", "message": "Disk full"},
+    ]
+
+    filtered = filter_rows(
+        rows,
+        level_filter="ERROR",
+        service_query="api",
+        message_query="timeout",
+    )
+
+    assert filtered == [
+        {
+            "level": "ERROR",
+            "service": "api-gateway",
+            "message": "Timeout while calling upstream",
+        }
+    ]
+
+
 def test_parse_hour_bucket_parses_iso_timestamp() -> None:
     assert parse_hour_bucket("2026-03-26T08:07:33Z") == "2026-03-26 08:00"
 
@@ -179,6 +209,24 @@ def test_analyze_csv_text_returns_summary_with_custom_source_name() -> None:
 
     assert summary["file_path"] == "tuotu.csv"
     assert summary["ERROR"] == 1
+    assert summary["top_error_messages"] == [("Timeout", 1)]
+
+
+def test_analyze_csv_text_applies_filters_to_summary() -> None:
+    summary = analyze_csv_text(
+        "timestamp,level,service,message\n"
+        "2026-03-26T08:00:00Z,ERROR,api-gateway,Timeout\n"
+        "2026-03-26T08:05:00Z,INFO,auth-service,Login ok\n"
+        "2026-03-26T08:10:00Z,ERROR,worker,Disk full\n",
+        source_name="tuotu.csv",
+        level_filter="ERROR",
+        service_query="api",
+        message_query="time",
+    )
+
+    assert summary["total_rows"] == 1
+    assert summary["ERROR"] == 1
+    assert summary["service_counts"] == {"api-gateway": 1}
     assert summary["top_error_messages"] == [("Timeout", 1)]
 
 

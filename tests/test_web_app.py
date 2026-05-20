@@ -1,28 +1,104 @@
-from pathlib import Path
+from io import BytesIO
 from unittest.mock import patch
 
-from src.web_app import analyze_from_form_data, decode_form_data, render_dashboard_page
+from src.web_app import (
+    MAX_REQUEST_SIZE_BYTES,
+    analyze_from_form_data,
+    application,
+    decode_multipart_form_data,
+    decode_urlencoded_form_data,
+    render_dashboard_page,
+    render_default_dashboard,
+)
 
 
-def test_decode_form_data_decodes_urlencoded_payload() -> None:
-    payload = b"file_path=data%2Fsample_logs.csv&top_services=3&top_errors=2"
+def build_multipart_payload(
+    fields: dict[str, str],
+    *,
+    file_name: str | None = None,
+    file_content: bytes = b"",
+) -> tuple[str, bytes]:
+    boundary = "----CodexBoundary12345"
+    chunks: list[bytes] = []
 
-    decoded = decode_form_data(payload)
+    for key, value in fields.items():
+        chunks.append(
+            (
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="{key}"\r\n\r\n'
+                f"{value}\r\n"
+            ).encode("utf-8")
+        )
+
+    if file_name is not None:
+        chunks.append(
+            (
+                f"--{boundary}\r\n"
+                'Content-Disposition: form-data; name="upload_file"; '
+                f'filename="{file_name}"\r\n'
+                "Content-Type: text/csv\r\n\r\n"
+            ).encode("utf-8")
+        )
+        chunks.append(file_content)
+        chunks.append(b"\r\n")
+
+    chunks.append(f"--{boundary}--\r\n".encode("utf-8"))
+    return f"multipart/form-data; boundary={boundary}", b"".join(chunks)
+
+
+def test_decode_urlencoded_form_data_decodes_payload() -> None:
+    payload = b"mode=sample&top_services=3&top_errors=2"
+
+    decoded = decode_urlencoded_form_data(payload)
 
     assert decoded == {
-        "file_path": "data/sample_logs.csv",
+        "mode": "sample",
         "top_services": "3",
         "top_errors": "2",
     }
 
 
-def test_analyze_from_form_data_prefers_inline_csv_text() -> None:
-    form_data = {
-        "csv_text": "timestamp,level,service,message\n2026-03-26T08:00:00Z,INFO,auth-service,Login ok\n",
-        "source_name": "upload.csv",
+def test_decode_multipart_form_data_reads_fields_and_upload() -> None:
+    content_type, body = build_multipart_payload(
+        {"mode": "analyze", "top_services": "4", "top_errors": "3"},
+        file_name="upload.csv",
+        file_content=(
+            b"timestamp,level,service,message\n"
+            b"2026-03-26T08:00:00Z,INFO,auth-service,Login ok\n"
+        ),
+    )
+
+    form_data, uploaded_file = decode_multipart_form_data(body, content_type)
+
+    assert form_data == {
+        "mode": "analyze",
         "top_services": "4",
         "top_errors": "3",
-        "file_path": "ignored.csv",
+    }
+    assert uploaded_file == {
+        "filename": "upload.csv",
+        "content": (
+            b"timestamp,level,service,message\n"
+            b"2026-03-26T08:00:00Z,INFO,auth-service,Login ok\n"
+        ),
+    }
+
+
+def test_analyze_from_form_data_uses_uploaded_csv() -> None:
+    form_data = {
+        "mode": "analyze",
+        "top_services": "4",
+        "top_errors": "3",
+        "level_filter": "ERROR",
+        "service_query": "api",
+        "message_query": "timeout",
+    }
+    uploaded_file = {
+        "filename": "upload.csv",
+        "content": (
+            b"timestamp,level,service,message\n"
+            b"2026-03-26T08:00:00Z,INFO,auth-service,Login ok\n"
+        ),
     }
 
     mocked_summary = {
@@ -39,13 +115,42 @@ def test_analyze_from_form_data_prefers_inline_csv_text() -> None:
     }
 
     with patch("src.web_app.analyze_csv_text", return_value=mocked_summary) as analyze_csv_text:
-        summary = analyze_from_form_data(form_data)
+        summary = analyze_from_form_data(form_data, uploaded_file)
 
     assert summary["file_path"] == "upload.csv"
-    analyze_csv_text.assert_called_once()
+    analyze_csv_text.assert_called_once_with(
+        "timestamp,level,service,message\n2026-03-26T08:00:00Z,INFO,auth-service,Login ok\n",
+        source_name="upload.csv",
+        top_services=4,
+        top_errors=3,
+        level_filter="ERROR",
+        service_query="api",
+        message_query="timeout",
+    )
 
 
-def test_render_dashboard_page_contains_ui_sections() -> None:
+def test_application_rejects_too_large_upload() -> None:
+    captured: dict[str, object] = {}
+
+    def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+        captured["status"] = status
+        captured["headers"] = headers
+
+    environ = {
+        "REQUEST_METHOD": "POST",
+        "PATH_INFO": "/analyze",
+        "CONTENT_TYPE": "multipart/form-data; boundary=ignored",
+        "CONTENT_LENGTH": str(MAX_REQUEST_SIZE_BYTES + 1),
+        "wsgi.input": BytesIO(b""),
+    }
+
+    body = b"".join(application(environ, start_response)).decode("utf-8")
+
+    assert captured["status"] == "413 Payload Too Large"
+    assert "Maksimikoko on 10 MB" in body
+
+
+def test_render_dashboard_page_contains_updated_ui_sections() -> None:
     summary = {
         "file_path": "data/sample_logs.csv",
         "total_rows": 10,
@@ -59,11 +164,33 @@ def test_render_dashboard_page_contains_ui_sections() -> None:
         "busiest_hour": ("2026-03-26 08:00", 5),
     }
 
-    page = render_dashboard_page(summary=summary, success_message="Valmis.")
+    page = render_dashboard_page(
+        summary=summary,
+        success_message="Valmis.",
+        form_state={
+            "level_filter": "ERROR",
+            "service_query": "api",
+            "message_query": "timeout",
+        },
+    )
     html = page.decode("utf-8")
 
     assert "IT Log Analyzer" in html
     assert "Valitse CSV koneelta" in html
+    assert "Komentorivi vaihtoehtona" in html
+    assert "Lokitaso" in html
+    assert "Palveluhaku" in html
+    assert "Viestihaku" in html
+    assert "Aktiiviset suodattimet" in html
+    assert "Taso: ERROR" in html
     assert "Palvelukohtainen yhteenveto" in html
     assert "Tuntikohtainen aktiivisuus" in html
     assert "Upstream service timeout" in html
+
+
+def test_render_default_dashboard_starts_without_sample_results() -> None:
+    html = render_default_dashboard().decode("utf-8")
+
+    assert "Ei analyysiä vielä" in html
+    assert "Raporttilinkit tulevat nakyviin analyysin jalkeen." in html
+    assert "Palvelukohtainen yhteenveto" not in html

@@ -15,6 +15,7 @@ Nykyinen versio:
 - näyttää lyhyen yhteenvedon terminaalissa
 - kirjoittaa Markdown-raportin tiedostoon `reports/report.md`
 - kirjoittaa HTML-raportin tiedostoon `reports/report.html`
+- muodostaa HTML-raportin samalla visuaalisella ilmeella kuin selainkayttoliittyma
 - tarjoaa selainkayttoliittyman tiedoston valintaan ja tulosten tarkasteluun
 - sisältää perustestit `pytest`-kirjastolla
 
@@ -95,11 +96,18 @@ http://127.0.0.1:8000
 
 Kayttoliittymassa voit:
 
+- aloittaa tyhjasta nakymasta ilman valmiiksi ladattua testidataa
 - kayttaa valmista sample-dataa yhdella painikkeella
-- valita CSV-tiedoston suoraan koneelta selaimen kautta
-- syottaa tiedostopolun kasin
+- ladata CSV-tiedoston suoraan koneelta selaimen kautta
+- suodattaa analyysia lokitason, palvelun tai viestisisallon perusteella
 - rajata naytettavien palveluiden ja ERROR-viestien maaraa
 - avata generoituja Markdown- ja HTML-raportteja suoraan linkeista
+
+Huomioitavaa:
+
+- selainkayttoliittyma tukee enintaan 10 MB kokoista UTF-8-koodattua CSV-tiedostoa
+- suora tiedostopolku kuuluu komentoriviversioon, ei web-kayttoliittymaan
+- komentorivilla voit edelleen ajaa analyysin esimerkiksi komennolla `python -m src.analyzer data/sample_logs.csv`
 
 ## Testit
 

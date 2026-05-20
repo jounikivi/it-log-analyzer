@@ -167,18 +167,79 @@ def positive_int(value: str) -> int:
     return integer
 
 
+def normalize_level_filter(level_filter: str) -> str:
+    """Normalisoi kayttoliittymasta tai API:sta saatu lokitasosuodatin."""
+
+    normalized = level_filter.strip().upper()
+    if not normalized:
+        return ""
+
+    if normalized not in (*SUPPORTED_LEVELS, "OTHER"):
+        raise ValueError("Tuntematon lokitasosuodatin.")
+
+    return normalized
+
+
+def filter_rows(
+    rows: Iterable[dict[str, str]],
+    *,
+    level_filter: str = "",
+    service_query: str = "",
+    message_query: str = "",
+) -> list[dict[str, str]]:
+    """Suodata lokiriveja tason, palvelun ja viestihaun perusteella."""
+
+    normalized_level = normalize_level_filter(level_filter)
+    normalized_service_query = service_query.strip().lower()
+    normalized_message_query = message_query.strip().lower()
+
+    filtered_rows: list[dict[str, str]] = []
+    for row in rows:
+        level = row.get("level", "").strip().upper()
+        service = row.get("service", "").strip().lower()
+        message = row.get("message", "").strip().lower()
+
+        if normalized_level:
+            if normalized_level == "OTHER":
+                if level in SUPPORTED_LEVELS:
+                    continue
+            elif level != normalized_level:
+                continue
+
+        if normalized_service_query and normalized_service_query not in service:
+            continue
+
+        if normalized_message_query and normalized_message_query not in message:
+            continue
+
+        filtered_rows.append(row)
+
+    return filtered_rows
+
+
 def analyze_log_rows(
     rows: list[dict[str, str]],
     source_name: str,
     top_services: int = 5,
     top_errors: int = 5,
+    *,
+    level_filter: str = "",
+    service_query: str = "",
+    message_query: str = "",
 ) -> LogSummary:
     """Luo valmis yhteenveto jo luetuista lokiriveista."""
 
-    summary = summarize_levels(rows)
-    service_counts = dict(list(summarize_services(rows).items())[:top_services])
-    top_error_messages = summarize_top_error_messages(rows, limit=top_errors)
-    hourly_counts = summarize_activity_by_hour(rows)
+    filtered_rows = filter_rows(
+        rows,
+        level_filter=level_filter,
+        service_query=service_query,
+        message_query=message_query,
+    )
+
+    summary = summarize_levels(filtered_rows)
+    service_counts = dict(list(summarize_services(filtered_rows).items())[:top_services])
+    top_error_messages = summarize_top_error_messages(filtered_rows, limit=top_errors)
+    hourly_counts = summarize_activity_by_hour(filtered_rows)
     busiest_hour = get_busiest_hour(hourly_counts)
 
     return {
@@ -196,6 +257,10 @@ def analyze_csv_text(
     source_name: str = "syotetty_lokidata.csv",
     top_services: int = 5,
     top_errors: int = 5,
+    *,
+    level_filter: str = "",
+    service_query: str = "",
+    message_query: str = "",
 ) -> LogSummary:
     """Analysoi selaimesta tai muualta saatua CSV-tekstia."""
 
@@ -205,11 +270,20 @@ def analyze_csv_text(
         source_name=source_name,
         top_services=top_services,
         top_errors=top_errors,
+        level_filter=level_filter,
+        service_query=service_query,
+        message_query=message_query,
     )
 
 
 def analyze_log_file(
-    file_path: str | Path, top_services: int = 5, top_errors: int = 5
+    file_path: str | Path,
+    top_services: int = 5,
+    top_errors: int = 5,
+    *,
+    level_filter: str = "",
+    service_query: str = "",
+    message_query: str = "",
 ) -> LogSummary:
     """Lue tiedosto ja palauta valmis yhteenveto."""
 
@@ -219,6 +293,9 @@ def analyze_log_file(
         source_name=str(Path(file_path)),
         top_services=top_services,
         top_errors=top_errors,
+        level_filter=level_filter,
+        service_query=service_query,
+        message_query=message_query,
     )
 
 
